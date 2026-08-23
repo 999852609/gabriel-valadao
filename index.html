@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora de Juros Compostos</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #1a1a2e;
+      --text-secondary: #555;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --input-bg: #f8f9fa;
+      --input-border: #d1d5db;
+      --result-bg: #f0f7ff;
+      --green: #16a34a;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --bar-invested: #93c5fd;
+      --bar-interest: #2563eb;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.25rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+
+    .field {
+      margin-bottom: 1.25rem;
+    }
+
+    .field label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 0.375rem;
+    }
+
+    .field small {
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap .prefix,
+    .input-wrap .suffix {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    .input-wrap .prefix { left: 12px; }
+    .input-wrap .suffix { right: 12px; }
+
+    .input-wrap input {
+      width: 100%;
+      padding: 0.7rem 0.75rem;
+      border: 1.5px solid var(--input-border);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: var(--input-bg);
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+
+    .input-wrap input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .input-wrap.has-prefix input { padding-left: 36px; }
+    .input-wrap.has-suffix input { padding-right: 36px; }
+
+    .period-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .period-row .input-wrap { flex: 1; }
+
+    .period-row select {
+      flex: 0 0 auto;
+      padding: 0.7rem 0.75rem;
+      border: 1.5px solid var(--input-border);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: var(--input-bg);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .period-row select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    button {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: var(--accent-hover); }
+
+    .results {
+      display: none;
+    }
+
+    .results.visible { display: block; }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-item {
+      background: var(--result-bg);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .result-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .result-item .label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.25rem;
+    }
+
+    .result-item .value {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .result-item.full .value {
+      font-size: 1.75rem;
+      color: var(--accent);
+    }
+
+    .result-item .value.green { color: var(--green); }
+
+    .chart-section h3 {
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .chart-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 180px;
+      min-width: 100%;
+      padding-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .chart-bar-group {
+      flex: 1;
+      min-width: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      height: 100%;
+      justify-content: flex-end;
+      position: relative;
+    }
+
+    .chart-bar-group .bar-interest {
+      background: var(--bar-interest);
+      border-radius: 2px 2px 0 0;
+    }
+
+    .chart-bar-group .bar-invested {
+      background: var(--bar-invested);
+    }
+
+    .chart-bar-group .bar-label {
+      position: absolute;
+      bottom: -1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .legend {
+      display: flex;
+      gap: 1.25rem;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .legend .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .table-section {
+      margin-top: 1.5rem;
+    }
+
+    .table-section h3 {
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .table-toggle {
+      background: none;
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: auto;
+      margin-bottom: 0.75rem;
+    }
+
+    .table-toggle:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      display: none;
+    }
+
+    .table-wrap.visible { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 0.6rem 0.5rem;
+      border-bottom: 2px solid var(--input-border);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    tbody td {
+      padding: 0.5rem;
+      border-bottom: 1px solid var(--input-border);
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 1.25rem; }
+      h1 { font-size: 1.35rem; }
+      .result-item .value { font-size: 1.1rem; }
+      .result-item.full .value { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Calculadora de Juros Compostos</h1>
+    <p class="subtitle">Simule o crescimento do seu investimento ao longo do tempo</p>
+
+    <div class="card">
+      <div class="field">
+        <label>Valor inicial</label>
+        <div class="input-wrap has-prefix">
+          <span class="prefix">R$</span>
+          <input type="text" id="principal" placeholder="1.000,00" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Aporte mensal</label>
+        <div class="input-wrap has-prefix">
+          <span class="prefix">R$</span>
+          <input type="text" id="monthly" placeholder="500,00" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Taxa de juros <small>(ao ano)</small></label>
+        <div class="input-wrap has-suffix">
+          <input type="text" id="rate" placeholder="12" inputmode="decimal">
+          <span class="suffix">%</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Periodo</label>
+        <div class="period-row">
+          <div class="input-wrap">
+            <input type="number" id="period" placeholder="10" min="1" inputmode="numeric">
+          </div>
+          <select id="periodUnit">
+            <option value="years">Anos</option>
+            <option value="months">Meses</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="calculate()">Calcular</button>
+    </div>
+
+    <div class="results" id="results">
+      <div class="card">
+        <div class="result-grid">
+          <div class="result-item full">
+            <div class="label">Montante final</div>
+            <div class="value" id="totalAmount">R$ 0,00</div>
+          </div>
+          <div class="result-item">
+            <div class="label">Total investido</div>
+            <div class="value" id="totalInvested">R$ 0,00</div>
+          </div>
+          <div class="result-item">
+            <div class="label">Juros ganhos</div>
+            <div class="value green" id="totalInterest">R$ 0,00</div>
+          </div>
+        </div>
+
+        <div class="chart-section">
+          <h3>Crescimento ao longo do tempo</h3>
+          <div class="chart-container">
+            <div class="chart" id="chart"></div>
+          </div>
+          <div class="legend">
+            <span><i class="dot" style="background:var(--bar-invested)"></i> Investido</span>
+            <span><i class="dot" style="background:var(--bar-interest)"></i> Juros</span>
+          </div>
+        </div>
+
+        <div class="table-section">
+          <button class="table-toggle" onclick="toggleTable()">Ver detalhes por ano</button>
+          <div class="table-wrap" id="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ano</th>
+                  <th>Investido</th>
+                  <th>Juros</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Calculadora de Juros Compostos &mdash; Gabriel Valadao</footer>
+  </div>
+
+  <script>
+    function parseBRL(str) {
+      if (!str) return 0;
+      return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+
+    function formatBRL(value) {
+      return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatInput(el) {
+      el.addEventListener('input', function () {
+        let v = this.value.replace(/[^\d,]/g, '');
+        this.value = v;
+      });
+    }
+
+    formatInput(document.getElementById('principal'));
+    formatInput(document.getElementById('monthly'));
+    formatInput(document.getElementById('rate'));
+
+    function calculate() {
+      var principal = parseBRL(document.getElementById('principal').value);
+      var monthly = parseBRL(document.getElementById('monthly').value);
+      var annualRate = parseBRL(document.getElementById('rate').value);
+      var period = parseInt(document.getElementById('period').value) || 0;
+      var unit = document.getElementById('periodUnit').value;
+
+      if (period <= 0) return;
+
+      var totalMonths = unit === 'years' ? period * 12 : period;
+      var monthlyRate = annualRate / 100 / 12;
+
+      var yearlyData = [];
+      var balance = principal;
+      var totalDeposited = principal;
+
+      for (var m = 1; m <= totalMonths; m++) {
+        balance = balance * (1 + monthlyRate) + monthly;
+        totalDeposited += monthly;
+
+        if (m % 12 === 0 || m === totalMonths) {
+          yearlyData.push({
+            label: m % 12 === 0 ? (m / 12) : Math.ceil(m / 12),
+            invested: totalDeposited,
+            total: balance,
+            interest: balance - totalDeposited
+          });
+        }
+      }
+
+      var finalData = yearlyData[yearlyData.length - 1];
+
+      document.getElementById('totalAmount').textContent = 'R$ ' + formatBRL(finalData.total);
+      document.getElementById('totalInvested').textContent = 'R$ ' + formatBRL(finalData.invested);
+      document.getElementById('totalInterest').textContent = 'R$ ' + formatBRL(finalData.interest);
+
+      renderChart(yearlyData);
+      renderTable(yearlyData);
+
+      document.getElementById('results').classList.add('visible');
+    }
+
+    function renderChart(data) {
+      var chart = document.getElementById('chart');
+      chart.innerHTML = '';
+
+      var maxVal = 0;
+      for (var i = 0; i < data.length; i++) {
+        if (data[i].total > maxVal) maxVal = data[i].total;
+      }
+
+      var showLabels = data.length <= 30;
+
+      for (var i = 0; i < data.length; i++) {
+        var d = data[i];
+        var investedH = maxVal > 0 ? (d.invested / maxVal) * 100 : 0;
+        var interestH = maxVal > 0 ? (d.interest / maxVal) * 100 : 0;
+
+        var group = document.createElement('div');
+        group.className = 'chart-bar-group';
+
+        var barInterest = document.createElement('div');
+        barInterest.className = 'bar-interest';
+        barInterest.style.height = interestH + '%';
+
+        var barInvested = document.createElement('div');
+        barInvested.className = 'bar-invested';
+        barInvested.style.height = investedH + '%';
+
+        group.appendChild(barInterest);
+        group.appendChild(barInvested);
+
+        if (showLabels) {
+          var label = document.createElement('div');
+          label.className = 'bar-label';
+          label.textContent = d.label;
+          group.appendChild(label);
+        }
+
+        group.title = 'Ano ' + d.label + '\nTotal: R$ ' + formatBRL(d.total) + '\nInvestido: R$ ' + formatBRL(d.invested) + '\nJuros: R$ ' + formatBRL(d.interest);
+
+        chart.appendChild(group);
+      }
+    }
+
+    function renderTable(data) {
+      var tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      for (var i = 0; i < data.length; i++) {
+        var d = data[i];
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + d.label + '</td>' +
+          '<td>R$ ' + formatBRL(d.invested) + '</td>' +
+          '<td>R$ ' + formatBRL(d.interest) + '</td>' +
+          '<td>R$ ' + formatBRL(d.total) + '</td>';
+        tbody.appendChild(tr);
+      }
+    }
+
+    function toggleTable() {
+      var wrap = document.getElementById('tableWrap');
+      wrap.classList.toggle('visible');
+      var btn = wrap.previousElementSibling;
+      btn.textContent = wrap.classList.contains('visible') ? 'Ocultar detalhes' : 'Ver detalhes por ano';
+    }
+  </script>
+
+</body>
+</html>
