@@ -482,11 +482,20 @@
       var month = now.getMonth() + 1;
       var dates = [];
 
-      for (var y = year; y >= year - 4; y--) {
+      // IFDATA publica dados com ~90 dias de atraso
+      // Subtrair 4 meses para estimar o ultimo trimestre disponivel
+      var availMonth = month - 4;
+      var availYear = year;
+      if (availMonth <= 0) {
+        availMonth += 12;
+        availYear--;
+      }
+
+      for (var y = availYear; y >= availYear - 4; y--) {
         var quarters = [12, 9, 6, 3];
         for (var i = 0; i < quarters.length; i++) {
           var m = quarters[i];
-          if (y === year && m >= month) continue;
+          if (y === availYear && m > availMonth) continue;
           dates.push(y.toString() + (m < 10 ? '0' + m : m.toString()));
         }
       }
@@ -577,7 +586,9 @@
 
       var bcbUrls = [
         BCB_BASE + 'IfDataCadastro(AnoMes=@AnoMes)?@AnoMes=' + dataBase + '&$top=1000&$format=json',
-        BCB_BASE + 'IfDataCadastro?$top=1000&$format=json'
+        BCB_BASE + "IfDataCadastro(AnoMes=@AnoMes)?@AnoMes='" + dataBase + "'&$top=1000&$format=json",
+        BCB_BASE + 'IfDataCadastro?$filter=AnoMes%20eq%20' + dataBase + '&$top=1000&$format=json',
+        BCB_BASE + "IfDataCadastro?$filter=AnoMes%20eq%20'" + dataBase + "'&$top=1000&$format=json"
       ];
 
       tryBcbUrls(bcbUrls, 0, query, function (data) {
@@ -610,10 +621,11 @@
         if (data && data.value && data.value.length > 0) {
           onSuccess(data);
         } else {
-          log('Resposta vazia, tentando proximo URL...');
+          log('Resposta vazia (value=[]), tentando proximo formato...');
           tryBcbUrls(bcbUrls, idx + 1, query, onSuccess, onError);
         }
       }, function () {
+        workingProxy = null;
         tryBcbUrls(bcbUrls, idx + 1, query, onSuccess, onError);
       });
     }
