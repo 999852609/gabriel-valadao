@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Download - WhatsApp Client Exporter</title>
+  <style>
+    .app-content { display: none; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #1a1a2e;
+      --text-secondary: #555;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --green: #16a34a;
+      --input-border: #d1d5db;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    nav {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    nav a {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--card);
+      border: 1.5px solid var(--input-border);
+      transition: all 0.2s;
+    }
+
+    nav a:hover { border-color: var(--accent); color: var(--accent); }
+    nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    nav .spacer { flex: 1; }
+
+    nav button.logout-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #dc2626;
+      background: #fef2f2;
+      border: 1.5px solid #fecaca;
+      cursor: pointer;
+    }
+
+    nav button.logout-btn:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+    .container { width: 100%; max-width: 600px; }
+
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; text-align: center; }
+
+    .subtitle {
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1.5px solid var(--input-border);
+    }
+
+    .download-hero {
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+
+    .download-hero .icon {
+      font-size: 3rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .download-hero .version {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-download {
+      display: inline-block;
+      padding: 0.9rem 2rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      margin-top: 1rem;
+    }
+
+    .btn-download:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+    .steps { counter-reset: step; }
+
+    .step {
+      counter-increment: step;
+      padding: 0.75rem 0 0.75rem 3rem;
+      position: relative;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .step:last-child { border-bottom: none; }
+
+    .step::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0.75rem;
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+
+    .step strong { color: var(--accent); }
+
+    .step code {
+      background: #f0f2f5;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .note {
+      background: #eff6ff;
+      color: var(--accent);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      margin-top: 1rem;
+      line-height: 1.5;
+    }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 1rem; }
+      h1 { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <script>
+    var authToken = sessionStorage.getItem('authToken');
+    if (!authToken) {
+      window.location.href = 'index.html';
+    } else {
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelector('.app-content').style.display = 'block';
+      });
+    }
+  </script>
+
+  <div class="app-content">
+  <div class="container">
+    <nav>
+      <a href="calculadora.html">Calculadora</a>
+      <a href="download.html" class="active">Download</a>
+      <span class="spacer"></span>
+      <button class="logout-btn" onclick="sessionStorage.clear(); window.location.href='index.html';">Sair</button>
+    </nav>
+
+    <div class="card">
+      <div class="download-hero">
+        <div class="icon">&#x1F4E6;</div>
+        <h1>WhatsApp Client Exporter</h1>
+        <p class="subtitle">Exporte conversas de clientes do WhatsApp Web em JSON</p>
+        <a class="btn-download" href="https://github.com/999852609/gabriel-valadao/archive/refs/heads/main.zip" target="_blank">Baixar extensao</a>
+        <p class="version">v1.0.0</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Como instalar</h2>
+      <div class="steps">
+        <div class="step">
+          Clique no botao <strong>Baixar extensao</strong> acima e salve o arquivo ZIP
+        </div>
+        <div class="step">
+          Extraia o ZIP. Dentro da pasta extraida, localize a subpasta <code>whatsapp-extension</code>
+        </div>
+        <div class="step">
+          Abra o Google Chrome e acesse <code>chrome://extensions/</code>
+        </div>
+        <div class="step">
+          Ative o <strong>Modo do desenvolvedor</strong> no canto superior direito
+        </div>
+        <div class="step">
+          Clique em <strong>Carregar sem compactacao</strong> e selecione a pasta <code>whatsapp-extension</code>
+        </div>
+        <div class="step">
+          Abra o <strong>WhatsApp Web</strong> (<code>web.whatsapp.com</code>) e recarregue a pagina
+        </div>
+        <div class="step">
+          O botao azul <strong>Exportar JSON</strong> aparece no canto superior direito. Clique para exportar!
+        </div>
+      </div>
+      <div class="note">
+        <strong>Importante:</strong> Quando houver uma atualizacao, basta baixar novamente, extrair e clicar em "Atualizar" na pagina de extensoes do Chrome.
+      </div>
+    </div>
+
+    <footer>Gabriel Valadao</footer>
+  </div>
+  </div>
+
+</body>
+</html>
