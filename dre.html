@@ -58,11 +58,7 @@
     nav a:hover { border-color: var(--accent); color: var(--accent); }
     nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.25rem;
-      text-align: center;
-    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; text-align: center; }
 
     .subtitle {
       color: var(--text-secondary);
@@ -103,10 +99,7 @@
       transition: border-color 0.2s;
     }
 
-    select:focus, input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
 
     .row { display: flex; gap: 0.75rem; }
     .row .field { flex: 1; }
@@ -148,7 +141,6 @@
 
     .inst-item:last-child { border-bottom: none; }
     .inst-item:hover { background: var(--row-hover); }
-
     .inst-item .inst-name { font-weight: 600; }
     .inst-item .inst-code { color: var(--text-secondary); font-size: 0.75rem; }
 
@@ -197,9 +189,7 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .error-msg {
-      background: #fef2f2;
-      color: var(--red);
+    .msg {
       padding: 1rem;
       border-radius: 8px;
       font-size: 0.85rem;
@@ -207,7 +197,36 @@
       margin-bottom: 1rem;
     }
 
-    .error-msg.visible { display: block; }
+    .msg.error { background: #fef2f2; color: var(--red); }
+    .msg.info { background: #eff6ff; color: var(--accent); }
+    .msg.visible { display: block; }
+
+    .debug-log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+      margin-bottom: 1rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .debug-log.visible { display: block; }
+
+    .toggle-debug {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: underline;
+      margin-bottom: 0.5rem;
+    }
 
     .dre-section { display: none; }
     .dre-section.visible { display: block; }
@@ -245,8 +264,6 @@
       font-size: 0.75rem;
       text-transform: uppercase;
       color: var(--text-secondary);
-      position: sticky;
-      top: 0;
     }
 
     table.dre thead th:last-child { text-align: right; }
@@ -264,10 +281,7 @@
       white-space: nowrap;
     }
 
-    table.dre tbody tr.subtotal {
-      font-weight: 700;
-      background: #f8fafc;
-    }
+    table.dre tbody tr.subtotal { font-weight: 700; background: #f8fafc; }
 
     table.dre tbody tr.total {
       font-weight: 700;
@@ -324,16 +338,16 @@
         <div class="field">
           <label>Tipo de Instituicao</label>
           <select id="tipoInst">
-            <option value="1">Conglomerados Bancarios I</option>
-            <option value="2">Conglomerados Bancarios II</option>
-            <option value="3">Instituicoes Individuais</option>
+            <option value="1">Congl. Bancarios I</option>
+            <option value="2">Congl. Bancarios II</option>
+            <option value="3">Inst. Individuais</option>
           </select>
         </div>
       </div>
 
       <div class="field">
         <label>Instituicao Financeira</label>
-        <input type="text" id="searchInst" placeholder="Digite o nome (ex: Banco do Brasil, Itau, Bradesco...)" autocomplete="off">
+        <input type="text" id="searchInst" placeholder="Digite o nome (ex: Itau, Bradesco, BB...)" autocomplete="off">
         <div class="inst-results" id="instResults"></div>
         <div class="selected-inst" id="selectedInst">
           <span id="selectedName"></span>
@@ -344,7 +358,11 @@
       <button class="primary" id="btnBuscar" onclick="fetchDRE()">Buscar DRE</button>
     </div>
 
-    <div class="error-msg" id="errorMsg"></div>
+    <div class="msg error" id="errorMsg"></div>
+    <div class="msg info" id="infoMsg"></div>
+
+    <button class="toggle-debug" onclick="toggleDebug()">Mostrar/ocultar log tecnico</button>
+    <div class="debug-log" id="debugLog"></div>
 
     <div class="loading" id="loading">
       <div class="spinner"></div>
@@ -376,19 +394,92 @@
   <script>
     var BASE = 'https://olinda.bcb.gov.br/olinda/servico/IFDATA/versao/v1/odata/';
     var selectedCodInst = null;
+    var selectedInstName = '';
     var institutionsCache = [];
+    var cachedDataBase = '';
+    var reportList = null;
+
+    function log(msg) {
+      var el = document.getElementById('debugLog');
+      var ts = new Date().toLocaleTimeString();
+      el.textContent += '[' + ts + '] ' + msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function toggleDebug() {
+      document.getElementById('debugLog').classList.toggle('visible');
+    }
+
+    function showError(msg) {
+      var el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function hideError() {
+      document.getElementById('errorMsg').classList.remove('visible');
+    }
+
+    function showInfo(msg) {
+      var el = document.getElementById('infoMsg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function hideInfo() {
+      document.getElementById('infoMsg').classList.remove('visible');
+    }
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function findField(obj, candidates) {
+      for (var i = 0; i < candidates.length; i++) {
+        if (obj[candidates[i]] !== undefined && obj[candidates[i]] !== null) {
+          return obj[candidates[i]];
+        }
+      }
+      return null;
+    }
+
+    function getInstName(obj) {
+      return findField(obj, [
+        'NomeInstituicao', 'nomeInstituicao', 'Nome', 'nome',
+        'NomeConglomerado', 'nomeConglomerado',
+        'Instituicao', 'instituicao',
+        'NomeInstituicaoFinanceira', 'NomeIF'
+      ]) || '';
+    }
+
+    function getInstCode(obj) {
+      return findField(obj, [
+        'CodInst', 'codInst', 'CodigoInstituicao', 'codigoInstituicao',
+        'Codigo', 'codigo', 'CodConglomerado', 'codConglomerado',
+        'CodigoIF', 'Id', 'id'
+      ]) || '';
+    }
+
+    function getInstSegmento(obj) {
+      return findField(obj, [
+        'Segmento', 'segmento', 'TipoInstituicao', 'tipoInstituicao',
+        'Tipo', 'tipo', 'Categoria', 'categoria'
+      ]) || '';
+    }
 
     function generateDates() {
       var sel = document.getElementById('dataBase');
       var now = new Date();
       var year = now.getFullYear();
       var month = now.getMonth() + 1;
-
       var dates = [];
-      for (var y = year; y >= year - 3; y--) {
-        var months = [12, 9, 6, 3];
-        for (var i = 0; i < months.length; i++) {
-          var m = months[i];
+
+      for (var y = year; y >= year - 4; y--) {
+        var quarters = [12, 9, 6, 3];
+        for (var i = 0; i < quarters.length; i++) {
+          var m = quarters[i];
           if (y === year && m >= month) continue;
           dates.push(y.toString() + (m < 10 ? '0' + m : m.toString()));
         }
@@ -401,7 +492,7 @@
         var yy = d.substring(0, 4);
         var mm = d.substring(4);
         var qMap = { '03': '1T', '06': '2T', '09': '3T', '12': '4T' };
-        opt.textContent = qMap[mm] + ' ' + yy + ' (' + mm + '/' + yy + ')';
+        opt.textContent = (qMap[mm] || mm) + ' ' + yy;
         sel.appendChild(opt);
       }
     }
@@ -416,62 +507,112 @@
         return;
       }
       clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(function () { searchInstitutions(q); }, 400);
+      searchTimeout = setTimeout(function () { loadAndSearchInstitutions(q); }, 500);
     });
 
-    function searchInstitutions(query) {
+    function loadAndSearchInstitutions(query) {
       var dataBase = document.getElementById('dataBase').value;
 
-      if (institutionsCache.length > 0 && institutionsCache._dataBase === dataBase) {
+      if (institutionsCache.length > 0 && cachedDataBase === dataBase) {
         filterAndShow(query);
         return;
       }
 
-      var url = BASE + 'IfDataCadastro(AnoMes=@AnoMes)?'
-        + '@AnoMes=' + dataBase
-        + '&$format=json';
+      log('Buscando lista de instituicoes para ' + dataBase + '...');
+
+      var urls = [
+        BASE + 'IfDataCadastro(AnoMes=@AnoMes)?@AnoMes=' + dataBase + '&$top=1000&$format=json',
+        BASE + 'IfDataCadastro?$top=1000&$filter=AnoMes%20eq%20' + dataBase + '&$format=json',
+        BASE + 'IfDataCadastro?$top=1000&$format=json'
+      ];
+
+      tryUrls(urls, 0, function (data) {
+        if (data && data.value && data.value.length > 0) {
+          institutionsCache = data.value;
+          cachedDataBase = dataBase;
+          log('Encontradas ' + data.value.length + ' instituicoes');
+          var sample = data.value[0];
+          log('Campos: ' + Object.keys(sample).join(', '));
+          filterAndShow(query);
+        } else {
+          log('Nenhuma instituicao retornada pela API');
+          showError('A API do Banco Central nao retornou dados de instituicoes para o periodo selecionado. Tente outro periodo.');
+        }
+      }, function (err) {
+        log('Erro ao buscar instituicoes: ' + err);
+        showError('Nao foi possivel conectar a API do Banco Central. Possivel bloqueio de CORS ou API fora do ar. Detalhes no log tecnico.');
+      });
+    }
+
+    function tryUrls(urls, idx, onSuccess, onError) {
+      if (idx >= urls.length) {
+        onError('Todas as tentativas falharam');
+        return;
+      }
+
+      var url = urls[idx];
+      log('Tentando: ' + url.substring(0, 120) + '...');
 
       fetch(url)
         .then(function (r) {
-          if (!r.ok) throw new Error('Erro ao buscar instituicoes: ' + r.status);
+          log('Resposta: HTTP ' + r.status);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
         })
         .then(function (data) {
-          institutionsCache = data.value || [];
-          institutionsCache._dataBase = dataBase;
-          filterAndShow(query);
+          if (data.value && data.value.length > 0) {
+            onSuccess(data);
+          } else {
+            log('Resposta vazia, tentando proximo URL...');
+            tryUrls(urls, idx + 1, onSuccess, onError);
+          }
         })
         .catch(function (err) {
-          showError('Nao foi possivel carregar a lista de instituicoes. Verifique sua conexao. (' + err.message + ')');
+          log('Falhou: ' + err.message);
+          tryUrls(urls, idx + 1, onSuccess, onError);
         });
     }
 
     function filterAndShow(query) {
       var q = query.toLowerCase();
       var results = institutionsCache.filter(function (inst) {
-        var name = (inst.NomeInstituicao || inst.nomeInstituicao || inst.Nome || '').toLowerCase();
-        return name.indexOf(q) !== -1;
+        var name = getInstName(inst).toLowerCase();
+        if (name) return name.indexOf(q) !== -1;
+        var allValues = Object.values(inst).join(' ').toLowerCase();
+        return allValues.indexOf(q) !== -1;
       }).slice(0, 20);
 
       var container = document.getElementById('instResults');
       container.innerHTML = '';
 
       if (results.length === 0) {
-        container.innerHTML = '<div class="inst-item">Nenhuma instituicao encontrada</div>';
+        container.innerHTML = '<div class="inst-item"><div class="inst-name">Nenhuma instituicao encontrada</div>'
+          + '<div class="inst-code">Tente outro nome ou periodo</div></div>';
         container.classList.add('visible');
         return;
       }
 
       for (var i = 0; i < results.length; i++) {
         var inst = results[i];
-        var name = inst.NomeInstituicao || inst.nomeInstituicao || inst.Nome || 'N/A';
-        var code = inst.CodInst || inst.codInst || inst.CodigoInstituicao || '';
-        var segmento = inst.Segmento || inst.segmento || '';
+        var name = getInstName(inst) || 'Instituicao ' + (i + 1);
+        var code = getInstCode(inst);
+        var segmento = getInstSegmento(inst);
+
+        if (!name && !code) {
+          var keys = Object.keys(inst);
+          for (var k = 0; k < keys.length; k++) {
+            var val = inst[keys[k]];
+            if (typeof val === 'string' && val.length > 5) {
+              name = val;
+              break;
+            }
+          }
+        }
 
         var div = document.createElement('div');
         div.className = 'inst-item';
         div.innerHTML = '<div class="inst-name">' + escapeHtml(name) + '</div>'
-          + '<div class="inst-code">Cod: ' + escapeHtml(String(code))
+          + '<div class="inst-code">' + (code ? 'Cod: ' + escapeHtml(String(code)) : '')
           + (segmento ? ' | ' + escapeHtml(segmento) : '') + '</div>';
         div.setAttribute('data-code', code);
         div.setAttribute('data-name', name);
@@ -486,14 +627,17 @@
 
     function selectInstitution(code, name) {
       selectedCodInst = code;
+      selectedInstName = name;
       document.getElementById('searchInst').style.display = 'none';
       hideResults();
-      document.getElementById('selectedName').textContent = name + ' (Cod: ' + code + ')';
+      document.getElementById('selectedName').textContent = name + (code ? ' (Cod: ' + code + ')' : '');
       document.getElementById('selectedInst').classList.add('visible');
+      hideError();
     }
 
     function clearSelection() {
       selectedCodInst = null;
+      selectedInstName = '';
       document.getElementById('searchInst').style.display = '';
       document.getElementById('searchInst').value = '';
       document.getElementById('selectedInst').classList.remove('visible');
@@ -516,6 +660,7 @@
       }
 
       hideError();
+      hideInfo();
       document.getElementById('dreSection').classList.remove('visible');
       document.getElementById('loading').classList.add('visible');
       document.getElementById('btnBuscar').disabled = true;
@@ -523,225 +668,231 @@
       var dataBase = document.getElementById('dataBase').value;
       var tipoInst = document.getElementById('tipoInst').value;
 
-      var url = BASE + 'IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?'
-        + '@AnoMes=' + dataBase
-        + '&@TipoInstituicao=' + tipoInst
-        + "&@Relatorio='DRE'"
-        + '&$filter=CodInst%20eq%20' + selectedCodInst
-        + '&$format=json';
+      log('Buscando DRE para inst=' + selectedCodInst + ' data=' + dataBase + ' tipo=' + tipoInst);
 
-      fetch(url)
-        .then(function (r) {
-          if (!r.ok) throw new Error('Status ' + r.status);
-          return r.json();
-        })
-        .then(function (data) {
-          var values = data.value || [];
-          if (values.length === 0) {
-            tryAlternativeReports(dataBase, tipoInst);
-            return;
-          }
-          renderDRE(values, dataBase);
-        })
-        .catch(function () {
-          tryAlternativeReports(dataBase, tipoInst);
+      if (reportList) {
+        tryDREReports(dataBase, tipoInst);
+      } else {
+        loadReportList(function () {
+          tryDREReports(dataBase, tipoInst);
         });
-    }
-
-    function tryAlternativeReports(dataBase, tipoInst) {
-      var reportCodes = [
-        "'Demonstra%C3%A7%C3%A3o%20de%20Resultado'",
-        "'4'",
-        "'DRE'",
-        "'Demonstracao%20de%20Resultado'",
-        "'demonstracao_resultado'"
-      ];
-      var tried = 0;
-
-      function tryNext() {
-        if (tried >= reportCodes.length) {
-          fetchReportList(dataBase, tipoInst);
-          return;
-        }
-
-        var code = reportCodes[tried];
-        tried++;
-
-        var url = BASE + 'IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?'
-          + '@AnoMes=' + dataBase
-          + '&@TipoInstituicao=' + tipoInst
-          + '&@Relatorio=' + code
-          + '&$filter=CodInst%20eq%20' + selectedCodInst
-          + '&$format=json';
-
-        fetch(url)
-          .then(function (r) {
-            if (!r.ok) throw new Error('nope');
-            return r.json();
-          })
-          .then(function (data) {
-            var values = data.value || [];
-            if (values.length > 0) {
-              renderDRE(values, dataBase);
-            } else {
-              tryNext();
-            }
-          })
-          .catch(function () {
-            tryNext();
-          });
       }
-
-      tryNext();
     }
 
-    function fetchReportList(dataBase, tipoInst) {
+    function loadReportList(callback) {
+      log('Carregando lista de relatorios...');
+
       var url = BASE + 'ListaDeRelatorio?$format=json';
 
       fetch(url)
         .then(function (r) {
-          if (!r.ok) throw new Error('Status ' + r.status);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
         })
         .then(function (data) {
-          var reports = data.value || [];
-          var dreReport = null;
-
-          for (var i = 0; i < reports.length; i++) {
-            var r = reports[i];
-            var name = (r.NomeRelatorio || r.nomeRelatorio || r.Nome || r.Descricao || JSON.stringify(r)).toLowerCase();
-            if (name.indexOf('resultado') !== -1 || name.indexOf('dre') !== -1 || name.indexOf('income') !== -1) {
-              dreReport = r;
-              break;
+          reportList = data.value || [];
+          log('Relatorios encontrados: ' + reportList.length);
+          if (reportList.length > 0) {
+            log('Campos relatorio: ' + Object.keys(reportList[0]).join(', '));
+            for (var i = 0; i < Math.min(reportList.length, 15); i++) {
+              var r = reportList[i];
+              var vals = Object.values(r).map(function (v) { return String(v); }).join(' | ');
+              log('  [' + i + '] ' + vals);
             }
           }
-
-          if (dreReport) {
-            var reportId = dreReport.CodigoRelatorio || dreReport.codigoRelatorio || dreReport.Id || dreReport.id || dreReport.Codigo;
-            fetchWithReportId(reportId, dataBase, tipoInst);
-          } else if (reports.length > 0) {
-            tryAllReports(reports, dataBase, tipoInst, 0);
-          } else {
-            finishWithError();
-          }
+          callback();
         })
-        .catch(function () {
-          finishWithError();
+        .catch(function (err) {
+          log('Falha ao carregar relatorios: ' + err.message);
+          reportList = [];
+          callback();
         });
     }
 
-    function fetchWithReportId(reportId, dataBase, tipoInst) {
-      var url = BASE + 'IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?'
-        + '@AnoMes=' + dataBase
-        + '&@TipoInstituicao=' + tipoInst
-        + "&@Relatorio='" + encodeURIComponent(reportId) + "'"
-        + '&$filter=CodInst%20eq%20' + selectedCodInst
-        + '&$format=json';
+    function tryDREReports(dataBase, tipoInst) {
+      var dreReports = [];
+
+      if (reportList && reportList.length > 0) {
+        for (var i = 0; i < reportList.length; i++) {
+          var r = reportList[i];
+          var allText = Object.values(r).map(function (v) { return String(v); }).join(' ').toLowerCase();
+          if (allText.indexOf('resultado') !== -1 || allText.indexOf('dre') !== -1) {
+            var code = findField(r, [
+              'CodigoRelatorio', 'codigoRelatorio', 'Codigo', 'codigo',
+              'Id', 'id', 'NomeRelatorio', 'nomeRelatorio', 'Nome', 'nome',
+              'Relatorio', 'relatorio'
+            ]);
+            if (code !== null) {
+              dreReports.push(String(code));
+              log('Relatorio DRE encontrado: ' + code);
+            }
+          }
+        }
+      }
+
+      var codesToTry = dreReports.concat([
+        'DRE',
+        'Demonstra%C3%A7%C3%A3o%20de%20Resultado',
+        'Demonstracao%20de%20Resultado',
+        '4', '3', '5', '2', '1'
+      ]);
+
+      var seen = {};
+      var unique = [];
+      for (var i = 0; i < codesToTry.length; i++) {
+        if (!seen[codesToTry[i]]) {
+          seen[codesToTry[i]] = true;
+          unique.push(codesToTry[i]);
+        }
+      }
+
+      tryReportCodes(unique, 0, dataBase, tipoInst);
+    }
+
+    function tryReportCodes(codes, idx, dataBase, tipoInst) {
+      if (idx >= codes.length) {
+        document.getElementById('loading').classList.remove('visible');
+        document.getElementById('btnBuscar').disabled = false;
+        showError('Nao foi possivel encontrar dados de DRE para esta instituicao/periodo. '
+          + 'Tente outro periodo ou tipo de instituicao. Veja o log tecnico para detalhes.');
+        return;
+      }
+
+      var code = codes[idx];
+      var encodedCode = encodeURIComponent(code);
+
+      var urls = [
+        BASE + "IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?"
+          + "@AnoMes=" + dataBase
+          + "&@TipoInstituicao=" + tipoInst
+          + "&@Relatorio='" + encodedCode + "'"
+          + "&$filter=CodInst%20eq%20" + selectedCodInst
+          + "&$format=json",
+        BASE + "IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?"
+          + "@AnoMes=" + dataBase
+          + "&@TipoInstituicao=" + tipoInst
+          + "&@Relatorio='" + encodedCode + "'"
+          + "&$format=json"
+      ];
+
+      log('Tentando relatorio: ' + code);
+
+      tryUrlsForDRE(urls, 0, function (data) {
+        var values = data.value || [];
+        if (values.length > 0) {
+          log('DRE encontrado com relatorio=' + code + ' (' + values.length + ' linhas)');
+          log('Campos DRE: ' + Object.keys(values[0]).join(', '));
+
+          var filteredValues = values;
+          if (!urls[0].includes('filter=CodInst') || values.length > 200) {
+            filteredValues = values.filter(function (v) {
+              var instCode = getInstCode(v);
+              return String(instCode) === String(selectedCodInst);
+            });
+            if (filteredValues.length === 0) filteredValues = values;
+          }
+
+          renderDRE(filteredValues, dataBase);
+        } else {
+          tryReportCodes(codes, idx + 1, dataBase, tipoInst);
+        }
+      }, function () {
+        tryReportCodes(codes, idx + 1, dataBase, tipoInst);
+      });
+    }
+
+    function tryUrlsForDRE(urls, idx, onSuccess, onError) {
+      if (idx >= urls.length) {
+        onError();
+        return;
+      }
+
+      var url = urls[idx];
+      log('  GET ' + url.substring(0, 140) + '...');
 
       fetch(url)
         .then(function (r) {
-          if (!r.ok) throw new Error('Status ' + r.status);
+          log('  -> HTTP ' + r.status);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
         })
         .then(function (data) {
           var values = data.value || [];
           if (values.length > 0) {
-            renderDRE(values, dataBase);
+            onSuccess(data);
           } else {
-            finishWithError();
+            tryUrlsForDRE(urls, idx + 1, onSuccess, onError);
           }
         })
-        .catch(function () {
-          finishWithError();
+        .catch(function (err) {
+          log('  -> Erro: ' + err.message);
+          tryUrlsForDRE(urls, idx + 1, onSuccess, onError);
         });
-    }
-
-    function tryAllReports(reports, dataBase, tipoInst, idx) {
-      if (idx >= Math.min(reports.length, 10)) {
-        finishWithError();
-        return;
-      }
-
-      var r = reports[idx];
-      var reportId = r.CodigoRelatorio || r.codigoRelatorio || r.Id || r.id || r.Codigo || r.codigo;
-
-      if (!reportId) {
-        tryAllReports(reports, dataBase, tipoInst, idx + 1);
-        return;
-      }
-
-      var url = BASE + 'IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?'
-        + '@AnoMes=' + dataBase
-        + '&@TipoInstituicao=' + tipoInst
-        + "&@Relatorio='" + encodeURIComponent(String(reportId)) + "'"
-        + '&$filter=CodInst%20eq%20' + selectedCodInst
-        + '&$top=5&$format=json';
-
-      fetch(url)
-        .then(function (r) {
-          if (!r.ok) throw new Error('nope');
-          return r.json();
-        })
-        .then(function (data) {
-          var values = data.value || [];
-          if (values.length > 0) {
-            var fullUrl = BASE + 'IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?'
-              + '@AnoMes=' + dataBase
-              + '&@TipoInstituicao=' + tipoInst
-              + "&@Relatorio='" + encodeURIComponent(String(reportId)) + "'"
-              + '&$filter=CodInst%20eq%20' + selectedCodInst
-              + '&$format=json';
-            return fetch(fullUrl).then(function (r2) { return r2.json(); });
-          }
-          return null;
-        })
-        .then(function (data) {
-          if (data && data.value && data.value.length > 0) {
-            renderDRE(data.value, dataBase);
-          } else {
-            tryAllReports(reports, dataBase, tipoInst, idx + 1);
-          }
-        })
-        .catch(function () {
-          tryAllReports(reports, dataBase, tipoInst, idx + 1);
-        });
-    }
-
-    function finishWithError() {
-      document.getElementById('loading').classList.remove('visible');
-      document.getElementById('btnBuscar').disabled = false;
-      showError('Nao foi possivel encontrar dados de DRE para esta instituicao/periodo. Tente outro periodo ou tipo de instituicao.');
     }
 
     function renderDRE(values, dataBase) {
       document.getElementById('loading').classList.remove('visible');
       document.getElementById('btnBuscar').disabled = false;
 
-      var instName = document.getElementById('selectedName').textContent;
       var yy = dataBase.substring(0, 4);
       var mm = dataBase.substring(4);
 
-      document.getElementById('dreTitle').textContent = 'DRE - ' + instName.split(' (Cod')[0];
+      document.getElementById('dreTitle').textContent = 'DRE - ' + selectedInstName;
       document.getElementById('dreMeta').textContent = 'Data-base: ' + mm + '/' + yy + ' | Valores em R$ mil';
 
       var tbody = document.getElementById('dreBody');
       tbody.innerHTML = '';
+
+      var descrCandidates = [
+        'DescrConta', 'descrConta', 'Descricao', 'descricao',
+        'NomeConta', 'nomeConta', 'Conta', 'conta',
+        'DescricaoConta', 'descricaoConta', 'Item', 'item'
+      ];
+
+      var valorCandidates = [
+        'Valor', 'valor', 'ValorConta', 'valorConta',
+        'Saldo', 'saldo', 'Montante', 'montante'
+      ];
 
       var totalKeys = ['resultado', 'lucro', 'prejuizo', 'total'];
       var subtotalKeys = ['subtotal', 'resultado bruto', 'resultado operacional', 'resultado antes'];
 
       for (var i = 0; i < values.length; i++) {
         var item = values[i];
-        var descr = item.DescrConta || item.descrConta || item.Descricao || item.descricao
-          || item.NomeConta || item.nomeConta || item.Conta || '';
-        var valor = item.Valor || item.valor || item.ValorConta || 0;
+        var descr = findField(item, descrCandidates);
+        var valor = findField(item, valorCandidates);
+
+        if (descr === null) {
+          var keys = Object.keys(item);
+          for (var k = 0; k < keys.length; k++) {
+            if (typeof item[keys[k]] === 'string' && item[keys[k]].length > 10) {
+              descr = item[keys[k]];
+              break;
+            }
+          }
+        }
+
+        if (descr === null) descr = 'Linha ' + (i + 1);
+
+        if (valor === null) {
+          var keys2 = Object.keys(item);
+          for (var k2 = 0; k2 < keys2.length; k2++) {
+            var v = item[keys2[k2]];
+            if (typeof v === 'number' && keys2[k2] !== 'CodInst' && keys2[k2] !== 'codInst') {
+              valor = v;
+              break;
+            }
+          }
+        }
 
         if (typeof valor === 'string') {
           valor = parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0;
         }
 
+        if (valor === null) valor = 0;
+
         var tr = document.createElement('tr');
-        var descrLower = descr.toLowerCase();
+        var descrLower = String(descr).toLowerCase();
 
         var isTotal = false;
         var isSubtotal = false;
@@ -768,7 +919,7 @@
         var valorFormatted = formatBRL(valor);
         var colorClass = valor > 0 ? 'positive' : (valor < 0 ? 'negative' : '');
 
-        tr.innerHTML = '<td>' + escapeHtml(descr) + '</td>'
+        tr.innerHTML = '<td>' + escapeHtml(String(descr)) + '</td>'
           + '<td class="' + colorClass + '">' + valorFormatted + '</td>';
         tbody.appendChild(tr);
       }
@@ -782,22 +933,6 @@
       var formatted = abs.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
       if (value < 0) return '-' + formatted;
       return formatted;
-    }
-
-    function escapeHtml(str) {
-      var div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showError(msg) {
-      var el = document.getElementById('errorMsg');
-      el.textContent = msg;
-      el.classList.add('visible');
-    }
-
-    function hideError() {
-      document.getElementById('errorMsg').classList.remove('visible');
     }
   </script>
 
