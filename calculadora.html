@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Calculadora de Juros Compostos</title>
   <style>
+    .app-content { display: none; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
@@ -382,9 +386,14 @@
   <script>
     if (!sessionStorage.getItem('authToken')) {
       window.location.href = 'index.html';
+    } else {
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelector('.app-content').style.display = 'block';
+      });
     }
   </script>
 
+  <div class="app-content">
   <div class="container">
     <nav>
       <a href="calculadora.html" class="active">Calculadora</a>
@@ -485,6 +494,7 @@
     </div>
 
     <footer>Calculadora de Juros Compostos &mdash; Gabriel Valadao</footer>
+  </div>
   </div>
 
   <script>
