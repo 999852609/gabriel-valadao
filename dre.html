@@ -370,6 +370,7 @@
     } else {
       document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('.app-content').style.display = 'block';
+        if(sessionStorage.getItem('authRole')==='admin'){var al=document.getElementById('adminLink');if(al)al.style.display='';}
       });
     }
   </script>
@@ -379,8 +380,9 @@
     <nav>
       <a href="calculadora.html">Calculadora</a>
       <a href="dre.html" class="active">DRE</a>
+      <a href="admin.html" id="adminLink" style="display:none;padding:0.5rem 1rem;border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:600;color:var(--text-secondary);background:var(--card);border:1.5px solid var(--input-border);">Admin</a>
       <span style="flex:1"></span>
-      <button onclick="sessionStorage.removeItem('authToken'); window.location.href='index.html';" style="padding:0.5rem 1rem;border-radius:8px;font-size:0.8rem;font-weight:600;color:#dc2626;background:#fef2f2;border:1.5px solid #fecaca;cursor:pointer;">Sair</button>
+      <button onclick="sessionStorage.clear(); window.location.href='index.html';" style="padding:0.5rem 1rem;border-radius:8px;font-size:0.8rem;font-weight:600;color:#dc2626;background:#fef2f2;border:1.5px solid #fecaca;cursor:pointer;">Sair</button>
     </nav>
 
     <h1>DRE - Demonstracao de Resultado</h1>

@@ -73,6 +73,8 @@
       border-radius: 12px;
       padding: 2rem;
       box-shadow: var(--shadow);
+      position: relative;
+      z-index: 1;
     }
 
     .field {
@@ -137,19 +139,22 @@
       cursor: pointer;
       transition: background 0.2s;
       margin-top: 0.5rem;
-    }
-
-    button:hover { background: var(--accent-hover); }
-
-    button {
       -webkit-appearance: none;
       touch-action: manipulation;
     }
 
-    .card {
-      position: relative;
-      z-index: 1;
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .loading-text {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      display: none;
     }
+
+    .loading-text.visible { display: block; }
 
     footer {
       margin-top: 2rem;
@@ -185,9 +190,10 @@
           <input type="password" id="password" placeholder="Digite sua senha" autocomplete="current-password">
         </div>
 
-        <div class="error-msg" id="errorMsg">Usuario ou senha incorretos.</div>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="loading-text" id="loadingText">Verificando credenciais...</div>
 
-        <button type="submit">Entrar</button>
+        <button type="submit" id="btnLogin">Entrar</button>
       </form>
     </div>
 
@@ -199,9 +205,22 @@
       window.location.href = 'calculadora.html';
     }
 
-    var USERS = {
-      'gabriel': 'e10adc3949ba59abbe56e057f20f883e'
-    };
+    var USERS_URL = 'users.json';
+    var cachedUsers = null;
+
+    function loadUsers(callback) {
+      if (cachedUsers) { callback(cachedUsers); return; }
+
+      fetch(USERS_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          cachedUsers = data;
+          callback(data);
+        })
+        .catch(function() {
+          callback(null);
+        });
+    }
 
     function md5(str) {
       function md5cycle(x, k) {
@@ -329,6 +348,10 @@
       var username = document.getElementById('username').value.trim().toLowerCase();
       var password = document.getElementById('password').value;
       var errorEl = document.getElementById('errorMsg');
+      var loadingEl = document.getElementById('loadingText');
+      var btn = document.getElementById('btnLogin');
+
+      errorEl.classList.remove('visible');
 
       if (!username || !password) {
         errorEl.textContent = 'Preencha todos os campos.';
@@ -336,20 +359,41 @@
         return false;
       }
 
-      var hash = md5(password);
+      btn.disabled = true;
+      loadingEl.classList.add('visible');
 
-      if (USERS[username] && USERS[username] === hash) {
-        sessionStorage.setItem('authToken', username + ':' + Date.now());
-        window.location.href = 'calculadora.html';
-      } else {
-        errorEl.textContent = 'Usuario ou senha incorretos.';
-        errorEl.classList.add('visible');
-        document.getElementById('password').value = '';
-        document.getElementById('password').classList.add('error');
-        setTimeout(function() {
-          document.getElementById('password').classList.remove('error');
-        }, 2000);
-      }
+      loadUsers(function(users) {
+        btn.disabled = false;
+        loadingEl.classList.remove('visible');
+
+        if (!users) {
+          errorEl.textContent = 'Erro ao conectar. Tente novamente.';
+          errorEl.classList.add('visible');
+          return;
+        }
+
+        var user = users[username];
+        var hash = md5(password);
+
+        if (user && user.active && user.hash === hash) {
+          sessionStorage.setItem('authToken', username + ':' + Date.now());
+          sessionStorage.setItem('authRole', user.role || 'user');
+          sessionStorage.setItem('authName', user.name || username);
+          window.location.href = 'calculadora.html';
+        } else if (user && !user.active) {
+          errorEl.textContent = 'Sua conta esta desativada. Contate o administrador.';
+          errorEl.classList.add('visible');
+        } else {
+          errorEl.textContent = 'Usuario ou senha incorretos.';
+          errorEl.classList.add('visible');
+          document.getElementById('password').value = '';
+          document.getElementById('password').classList.add('error');
+          setTimeout(function() {
+            document.getElementById('password').classList.remove('error');
+          }, 2000);
+        }
+      });
+
       return false;
     }
 
