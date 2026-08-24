@@ -88,10 +88,16 @@
       padding: 0.75rem;
       border: 1.5px solid var(--input-border);
       border-radius: 8px;
-      font-size: 1rem;
+      font-size: 16px;
       background: var(--input-bg);
       color: var(--text);
       transition: border-color 0.2s;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      touch-action: manipulation;
+      position: relative;
+      z-index: 1;
     }
 
     .field input:focus {
@@ -131,6 +137,16 @@
     }
 
     button:hover { background: var(--accent-hover); }
+
+    button {
+      -webkit-appearance: none;
+      touch-action: manipulation;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+    }
 
     footer {
       margin-top: 2rem;
