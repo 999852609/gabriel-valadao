@@ -392,7 +392,13 @@
   </div>
 
   <script>
-    var BASE = 'https://olinda.bcb.gov.br/olinda/servico/IFDATA/versao/v1/odata/';
+    var BCB_BASE = 'https://olinda.bcb.gov.br/olinda/servico/IFDATA/versao/v1/odata/';
+    var PROXIES = [
+      '',
+      'https://api.allorigins.win/raw?url=',
+      'https://corsproxy.io/?url='
+    ];
+    var workingProxy = null;
     var selectedCodInst = null;
     var selectedInstName = '';
     var institutionsCache = [];
@@ -510,6 +516,54 @@
       searchTimeout = setTimeout(function () { loadAndSearchInstitutions(q); }, 500);
     });
 
+    function fetchWithProxy(bcbUrl, onSuccess, onError) {
+      if (workingProxy !== null) {
+        var finalUrl = workingProxy ? workingProxy + encodeURIComponent(bcbUrl) : bcbUrl;
+        log('Usando proxy conhecido: ' + (workingProxy || 'direto'));
+        fetch(finalUrl)
+          .then(function (r) {
+            log('-> HTTP ' + r.status);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(onSuccess)
+          .catch(function (err) {
+            log('-> Erro: ' + err.message);
+            onError(err.message);
+          });
+        return;
+      }
+
+      tryProxies(bcbUrl, 0, onSuccess, onError);
+    }
+
+    function tryProxies(bcbUrl, idx, onSuccess, onError) {
+      if (idx >= PROXIES.length) {
+        onError('Nenhum proxy funcionou');
+        return;
+      }
+
+      var proxy = PROXIES[idx];
+      var finalUrl = proxy ? proxy + encodeURIComponent(bcbUrl) : bcbUrl;
+      log('Tentando ' + (proxy ? 'proxy ' + proxy.substring(0, 30) : 'conexao direta') + '...');
+
+      fetch(finalUrl)
+        .then(function (r) {
+          log('-> HTTP ' + r.status);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          workingProxy = proxy;
+          log('Proxy funcionando: ' + (proxy || 'direto'));
+          onSuccess(data);
+        })
+        .catch(function (err) {
+          log('-> Falhou: ' + err.message);
+          tryProxies(bcbUrl, idx + 1, onSuccess, onError);
+        });
+    }
+
     function loadAndSearchInstitutions(query) {
       var dataBase = document.getElementById('dataBase').value;
 
@@ -519,14 +573,15 @@
       }
 
       log('Buscando lista de instituicoes para ' + dataBase + '...');
+      showInfo('Conectando ao Banco Central... (primeira busca pode demorar)');
 
-      var urls = [
-        BASE + 'IfDataCadastro(AnoMes=@AnoMes)?@AnoMes=' + dataBase + '&$top=1000&$format=json',
-        BASE + 'IfDataCadastro?$top=1000&$filter=AnoMes%20eq%20' + dataBase + '&$format=json',
-        BASE + 'IfDataCadastro?$top=1000&$format=json'
+      var bcbUrls = [
+        BCB_BASE + 'IfDataCadastro(AnoMes=@AnoMes)?@AnoMes=' + dataBase + '&$top=1000&$format=json',
+        BCB_BASE + 'IfDataCadastro?$top=1000&$format=json'
       ];
 
-      tryUrls(urls, 0, function (data) {
+      tryBcbUrls(bcbUrls, 0, query, function (data) {
+        hideInfo();
         if (data && data.value && data.value.length > 0) {
           institutionsCache = data.value;
           cachedDataBase = dataBase;
@@ -535,42 +590,32 @@
           log('Campos: ' + Object.keys(sample).join(', '));
           filterAndShow(query);
         } else {
-          log('Nenhuma instituicao retornada pela API');
-          showError('A API do Banco Central nao retornou dados de instituicoes para o periodo selecionado. Tente outro periodo.');
+          log('API retornou dados vazios');
+          showError('A API do Banco Central nao retornou instituicoes para este periodo. Tente outro periodo.');
         }
       }, function (err) {
-        log('Erro ao buscar instituicoes: ' + err);
-        showError('Nao foi possivel conectar a API do Banco Central. Possivel bloqueio de CORS ou API fora do ar. Detalhes no log tecnico.');
+        hideInfo();
+        log('Todas as tentativas falharam: ' + err);
+        showError('Nao foi possivel conectar a API do Banco Central. Verifique sua conexao e tente novamente. Detalhes no log tecnico.');
       });
     }
 
-    function tryUrls(urls, idx, onSuccess, onError) {
-      if (idx >= urls.length) {
-        onError('Todas as tentativas falharam');
+    function tryBcbUrls(bcbUrls, idx, query, onSuccess, onError) {
+      if (idx >= bcbUrls.length) {
+        onError('Nenhuma URL funcionou');
         return;
       }
 
-      var url = urls[idx];
-      log('Tentando: ' + url.substring(0, 120) + '...');
-
-      fetch(url)
-        .then(function (r) {
-          log('Resposta: HTTP ' + r.status);
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
-        .then(function (data) {
-          if (data.value && data.value.length > 0) {
-            onSuccess(data);
-          } else {
-            log('Resposta vazia, tentando proximo URL...');
-            tryUrls(urls, idx + 1, onSuccess, onError);
-          }
-        })
-        .catch(function (err) {
-          log('Falhou: ' + err.message);
-          tryUrls(urls, idx + 1, onSuccess, onError);
-        });
+      fetchWithProxy(bcbUrls[idx], function (data) {
+        if (data && data.value && data.value.length > 0) {
+          onSuccess(data);
+        } else {
+          log('Resposta vazia, tentando proximo URL...');
+          tryBcbUrls(bcbUrls, idx + 1, query, onSuccess, onError);
+        }
+      }, function () {
+        tryBcbUrls(bcbUrls, idx + 1, query, onSuccess, onError);
+      });
     }
 
     function filterAndShow(query) {
@@ -682,31 +727,25 @@
     function loadReportList(callback) {
       log('Carregando lista de relatorios...');
 
-      var url = BASE + 'ListaDeRelatorio?$format=json';
+      var bcbUrl = BCB_BASE + 'ListaDeRelatorio?$format=json';
 
-      fetch(url)
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
-        .then(function (data) {
-          reportList = data.value || [];
-          log('Relatorios encontrados: ' + reportList.length);
-          if (reportList.length > 0) {
-            log('Campos relatorio: ' + Object.keys(reportList[0]).join(', '));
-            for (var i = 0; i < Math.min(reportList.length, 15); i++) {
-              var r = reportList[i];
-              var vals = Object.values(r).map(function (v) { return String(v); }).join(' | ');
-              log('  [' + i + '] ' + vals);
-            }
+      fetchWithProxy(bcbUrl, function (data) {
+        reportList = data.value || [];
+        log('Relatorios encontrados: ' + reportList.length);
+        if (reportList.length > 0) {
+          log('Campos relatorio: ' + Object.keys(reportList[0]).join(', '));
+          for (var i = 0; i < Math.min(reportList.length, 15); i++) {
+            var r = reportList[i];
+            var vals = Object.values(r).map(function (v) { return String(v); }).join(' | ');
+            log('  [' + i + '] ' + vals);
           }
-          callback();
-        })
-        .catch(function (err) {
-          log('Falha ao carregar relatorios: ' + err.message);
-          reportList = [];
-          callback();
-        });
+        }
+        callback();
+      }, function (err) {
+        log('Falha ao carregar relatorios: ' + err);
+        reportList = [];
+        callback();
+      });
     }
 
     function tryDREReports(dataBase, tipoInst) {
@@ -759,32 +798,31 @@
       }
 
       var code = codes[idx];
-      var encodedCode = encodeURIComponent(code);
 
-      var urls = [
-        BASE + "IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?"
+      var bcbUrls = [
+        BCB_BASE + "IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?"
           + "@AnoMes=" + dataBase
           + "&@TipoInstituicao=" + tipoInst
-          + "&@Relatorio='" + encodedCode + "'"
+          + "&@Relatorio='" + encodeURIComponent(code) + "'"
           + "&$filter=CodInst%20eq%20" + selectedCodInst
           + "&$format=json",
-        BASE + "IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?"
+        BCB_BASE + "IfDataValores(AnoMes=@AnoMes,TipoInstituicao=@TipoInstituicao,Relatorio=@Relatorio)?"
           + "@AnoMes=" + dataBase
           + "&@TipoInstituicao=" + tipoInst
-          + "&@Relatorio='" + encodedCode + "'"
+          + "&@Relatorio='" + encodeURIComponent(code) + "'"
           + "&$format=json"
       ];
 
       log('Tentando relatorio: ' + code);
 
-      tryUrlsForDRE(urls, 0, function (data) {
+      tryBcbUrlsForDRE(bcbUrls, 0, dataBase, function (data) {
         var values = data.value || [];
         if (values.length > 0) {
           log('DRE encontrado com relatorio=' + code + ' (' + values.length + ' linhas)');
           log('Campos DRE: ' + Object.keys(values[0]).join(', '));
 
           var filteredValues = values;
-          if (!urls[0].includes('filter=CodInst') || values.length > 200) {
+          if (values.length > 100) {
             filteredValues = values.filter(function (v) {
               var instCode = getInstCode(v);
               return String(instCode) === String(selectedCodInst);
@@ -801,33 +839,24 @@
       });
     }
 
-    function tryUrlsForDRE(urls, idx, onSuccess, onError) {
-      if (idx >= urls.length) {
+    function tryBcbUrlsForDRE(bcbUrls, idx, dataBase, onSuccess, onError) {
+      if (idx >= bcbUrls.length) {
         onError();
         return;
       }
 
-      var url = urls[idx];
-      log('  GET ' + url.substring(0, 140) + '...');
+      log('  GET ' + bcbUrls[idx].substring(0, 100) + '...');
 
-      fetch(url)
-        .then(function (r) {
-          log('  -> HTTP ' + r.status);
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
-        .then(function (data) {
-          var values = data.value || [];
-          if (values.length > 0) {
-            onSuccess(data);
-          } else {
-            tryUrlsForDRE(urls, idx + 1, onSuccess, onError);
-          }
-        })
-        .catch(function (err) {
-          log('  -> Erro: ' + err.message);
-          tryUrlsForDRE(urls, idx + 1, onSuccess, onError);
-        });
+      fetchWithProxy(bcbUrls[idx], function (data) {
+        var values = data.value || [];
+        if (values.length > 0) {
+          onSuccess(data);
+        } else {
+          tryBcbUrlsForDRE(bcbUrls, idx + 1, dataBase, onSuccess, onError);
+        }
+      }, function () {
+        tryBcbUrlsForDRE(bcbUrls, idx + 1, dataBase, onSuccess, onError);
+      });
     }
 
     function renderDRE(values, dataBase) {
