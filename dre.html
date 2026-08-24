@@ -304,6 +304,46 @@
       text-align: center;
     }
 
+    .dre-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .summary-card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 0.75rem 0.5rem;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .summary-card .label {
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      letter-spacing: 0.02em;
+    }
+
+    .summary-card .value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    table.dre tbody tr.indent td:first-child {
+      padding-left: 1.5rem;
+      font-size: 0.8rem;
+    }
+
+    table.dre tbody tr.section-sep td {
+      padding: 0.15rem;
+      border: none;
+    }
+
     footer {
       margin-top: 2rem;
       font-size: 0.8rem;
@@ -370,6 +410,20 @@
     </div>
 
     <div class="dre-section" id="dreSection">
+      <div class="dre-summary">
+        <div class="summary-card">
+          <div class="label">Receitas</div>
+          <div class="value positive" id="summaryReceitas">-</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Despesas</div>
+          <div class="value negative" id="summaryDespesas">-</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Resultado</div>
+          <div class="value" id="summaryResultado">-</div>
+        </div>
+      </div>
       <div class="dre-header">
         <h2 id="dreTitle"></h2>
         <div class="dre-meta" id="dreMeta"></div>
@@ -871,6 +925,62 @@
       });
     }
 
+    function detectDescrField(values) {
+      var candidates = [
+        'DescrConta', 'descrConta', 'DescrContaContabil', 'descrContaContabil',
+        'Descricao', 'descricao', 'NomeConta', 'nomeConta',
+        'DescricaoConta', 'descricaoConta', 'Item', 'item', 'Nome', 'nome'
+      ];
+
+      var checkCount = Math.min(values.length, 5);
+
+      for (var c = 0; c < candidates.length; c++) {
+        for (var i = 0; i < checkCount; i++) {
+          var val = values[i][candidates[c]];
+          if (val !== undefined && val !== null && String(val).length > 0 && /[a-zA-ZÀ-ú]/.test(String(val))) {
+            return candidates[c];
+          }
+        }
+      }
+
+      var skipFields = { 'AnoMes': 1, 'anoMes': 1, 'Relatorio': 1, 'relatorio': 1,
+                         'TipoInstituicao': 1, 'tipoInstituicao': 1 };
+      var keys = Object.keys(values[0]);
+
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        if (skipFields[key]) continue;
+        for (var i = 0; i < checkCount; i++) {
+          var val = values[i][key];
+          if (typeof val === 'string' && val.length > 3 && /[a-zA-ZÀ-ú]/.test(val) && !/^\d+$/.test(val.trim())) {
+            return key;
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function detectValorField(item) {
+      var candidates = ['Valor', 'valor', 'ValorConta', 'valorConta', 'Saldo', 'saldo', 'Montante', 'montante'];
+
+      for (var i = 0; i < candidates.length; i++) {
+        if (item[candidates[i]] !== undefined && item[candidates[i]] !== null) {
+          return candidates[i];
+        }
+      }
+
+      var skipPattern = /^(CodInst|codInst|AnoMes|TipoInstituicao|Conta|CodConta|codConta)$/;
+      var keys = Object.keys(item);
+      for (var k = 0; k < keys.length; k++) {
+        if (typeof item[keys[k]] === 'number' && !skipPattern.test(keys[k])) {
+          return keys[k];
+        }
+      }
+
+      return null;
+    }
+
     function renderDRE(values, dataBase) {
       document.getElementById('loading').classList.remove('visible');
       document.getElementById('btnBuscar').disabled = false;
@@ -881,92 +991,220 @@
       document.getElementById('dreTitle').textContent = 'DRE - ' + selectedInstName;
       document.getElementById('dreMeta').textContent = 'Data-base: ' + mm + '/' + yy + ' | Valores em R$ mil';
 
-      var tbody = document.getElementById('dreBody');
-      tbody.innerHTML = '';
+      var first = values[0];
+      var fieldKeys = Object.keys(first);
+      log('=== CAMPOS DA RESPOSTA (' + fieldKeys.length + ' campos, ' + values.length + ' linhas) ===');
+      for (var f = 0; f < fieldKeys.length; f++) {
+        log('  ' + fieldKeys[f] + ' (' + typeof first[fieldKeys[f]] + ') = ' + JSON.stringify(first[fieldKeys[f]]).substring(0, 60));
+      }
 
-      var descrCandidates = [
-        'DescrConta', 'descrConta', 'Descricao', 'descricao',
-        'NomeConta', 'nomeConta', 'Conta', 'conta',
-        'DescricaoConta', 'descricaoConta', 'Item', 'item'
-      ];
+      var descrField = detectDescrField(values);
+      var valorField = detectValorField(first);
 
-      var valorCandidates = [
-        'Valor', 'valor', 'ValorConta', 'valorConta',
-        'Saldo', 'saldo', 'Montante', 'montante'
-      ];
+      log('Campo descricao: ' + (descrField || 'NENHUM'));
+      log('Campo valor: ' + (valorField || 'NENHUM'));
 
-      var totalKeys = ['resultado', 'lucro', 'prejuizo', 'total'];
-      var subtotalKeys = ['subtotal', 'resultado bruto', 'resultado operacional', 'resultado antes'];
-
+      var items = [];
       for (var i = 0; i < values.length; i++) {
-        var item = values[i];
-        var descr = findField(item, descrCandidates);
-        var valor = findField(item, valorCandidates);
-
-        if (descr === null) {
-          var keys = Object.keys(item);
-          for (var k = 0; k < keys.length; k++) {
-            if (typeof item[keys[k]] === 'string' && item[keys[k]].length > 10) {
-              descr = item[keys[k]];
-              break;
-            }
-          }
-        }
-
-        if (descr === null) descr = 'Linha ' + (i + 1);
-
-        if (valor === null) {
-          var keys2 = Object.keys(item);
-          for (var k2 = 0; k2 < keys2.length; k2++) {
-            var v = item[keys2[k2]];
-            if (typeof v === 'number' && keys2[k2] !== 'CodInst' && keys2[k2] !== 'codInst') {
-              valor = v;
-              break;
-            }
-          }
-        }
+        var row = values[i];
+        var descr = descrField ? String(row[descrField] || '') : '';
+        var valor = valorField ? row[valorField] : 0;
 
         if (typeof valor === 'string') {
           valor = parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0;
         }
+        if (valor === null || valor === undefined) valor = 0;
 
-        if (valor === null) valor = 0;
+        var conta = String(row.Conta || row.CodConta || row.conta || row.codConta || '');
 
+        items.push({ descr: descr, valor: valor, conta: conta, idx: i });
+      }
+
+      if (descrField) {
+        renderWithDescriptions(items);
+      } else {
+        renderWithoutDescriptions(items);
+      }
+
+      updateSummaryCards(items);
+      document.getElementById('dreSection').classList.add('visible');
+      document.getElementById('dreSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function isKeyRow(descr) {
+      var lower = descr.toLowerCase();
+      var keywords = ['resultado', 'lucro', 'prejuizo', 'total', 'receita de intermediac',
+                       'despesa de intermediac', 'imposto', 'contribuicao social',
+                       'receitas de intermediac', 'despesas de intermediac'];
+      for (var k = 0; k < keywords.length; k++) {
+        if (lower.indexOf(keywords[k]) !== -1) return true;
+      }
+      return false;
+    }
+
+    function renderWithDescriptions(items) {
+      var tbody = document.getElementById('dreBody');
+      tbody.innerHTML = '';
+
+      var filtered = items.filter(function(it) { return it.valor !== 0 || isKeyRow(it.descr); });
+
+      if (filtered.length > 25) {
+        var maxVal = 0;
+        for (var i = 0; i < filtered.length; i++) {
+          var abs = Math.abs(filtered[i].valor);
+          if (abs > maxVal) maxVal = abs;
+        }
+        var threshold = maxVal * 0.005;
+        filtered = filtered.filter(function(it) { return Math.abs(it.valor) > threshold || isKeyRow(it.descr); });
+      }
+
+      if (filtered.length > 25) {
+        var keyItems = filtered.filter(function(it) { return isKeyRow(it.descr); });
+        var otherItems = filtered.filter(function(it) { return !isKeyRow(it.descr); });
+        otherItems.sort(function(a, b) { return Math.abs(b.valor) - Math.abs(a.valor); });
+        filtered = keyItems.concat(otherItems.slice(0, 25 - keyItems.length));
+        filtered.sort(function(a, b) { return a.idx - b.idx; });
+      }
+
+      var totalKeys = ['resultado liquido', 'lucro liquido', 'prejuizo liquido', 'resultado do periodo',
+                        'lucro/prejuizo', 'lucro (prejuizo)'];
+      var subtotalKeys = ['resultado bruto', 'resultado operacional', 'resultado antes',
+                           'resultado de intermediac', 'resultado nao operacional',
+                           'total de receitas', 'total de despesas', 'receitas de intermediac',
+                           'despesas de intermediac', 'outras receitas', 'outras despesas',
+                           'imposto de renda', 'contribuicao social'];
+
+      for (var i = 0; i < filtered.length; i++) {
+        var item = filtered[i];
         var tr = document.createElement('tr');
-        var descrLower = String(descr).toLowerCase();
+        var descrLower = item.descr.toLowerCase().replace(/[áàâã]/g, 'a')
+          .replace(/[éèê]/g, 'e').replace(/[íìî]/g, 'i')
+          .replace(/[óòôõ]/g, 'o').replace(/[úùû]/g, 'u').replace(/ç/g, 'c');
 
         var isTotal = false;
         var isSubtotal = false;
 
         for (var t = 0; t < totalKeys.length; t++) {
-          if (descrLower.indexOf(totalKeys[t]) !== -1 && descrLower.indexOf('parcial') === -1) {
-            isTotal = true;
-            break;
-          }
+          if (descrLower.indexOf(totalKeys[t]) !== -1) { isTotal = true; break; }
         }
 
         if (!isTotal) {
           for (var s = 0; s < subtotalKeys.length; s++) {
-            if (descrLower.indexOf(subtotalKeys[s]) !== -1) {
-              isSubtotal = true;
-              break;
-            }
+            if (descrLower.indexOf(subtotalKeys[s]) !== -1) { isSubtotal = true; break; }
           }
+        }
+
+        if (!isTotal && !isSubtotal && item.descr === item.descr.toUpperCase() && item.descr.length > 5) {
+          isSubtotal = true;
         }
 
         if (isTotal) tr.className = 'total';
         else if (isSubtotal) tr.className = 'subtotal';
+        else tr.className = 'indent';
 
-        var valorFormatted = formatBRL(valor);
-        var colorClass = valor > 0 ? 'positive' : (valor < 0 ? 'negative' : '');
+        var valorFormatted = formatBRL(item.valor);
+        var colorClass = item.valor > 0 ? 'positive' : (item.valor < 0 ? 'negative' : '');
 
-        tr.innerHTML = '<td>' + escapeHtml(String(descr)) + '</td>'
+        tr.innerHTML = '<td>' + escapeHtml(item.descr) + '</td>'
           + '<td class="' + colorClass + '">' + valorFormatted + '</td>';
         tbody.appendChild(tr);
       }
+    }
 
-      document.getElementById('dreSection').classList.add('visible');
-      document.getElementById('dreSection').scrollIntoView({ behavior: 'smooth' });
+    function renderWithoutDescriptions(items) {
+      var tbody = document.getElementById('dreBody');
+      tbody.innerHTML = '';
+
+      var receitas = [];
+      var despesas = [];
+
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].valor > 0) receitas.push(items[i]);
+        else if (items[i].valor < 0) despesas.push(items[i]);
+      }
+
+      receitas.sort(function(a, b) { return b.valor - a.valor; });
+      despesas.sort(function(a, b) { return Math.abs(b.valor) - Math.abs(a.valor); });
+
+      var totalReceitas = 0;
+      for (var i = 0; i < receitas.length; i++) totalReceitas += receitas[i].valor;
+      var totalDespesas = 0;
+      for (var i = 0; i < despesas.length; i++) totalDespesas += despesas[i].valor;
+      var resultado = totalReceitas + totalDespesas;
+
+      var maxShow = 5;
+
+      addDreRow(tbody, 'RECEITAS', totalReceitas, 'subtotal');
+      for (var i = 0; i < Math.min(receitas.length, maxShow); i++) {
+        var label = receitas[i].conta ? 'Conta ' + receitas[i].conta : 'Item ' + (i + 1);
+        addDreRow(tbody, label, receitas[i].valor, 'indent');
+      }
+      if (receitas.length > maxShow) {
+        var outrasRec = 0;
+        for (var j = maxShow; j < receitas.length; j++) outrasRec += receitas[j].valor;
+        addDreRow(tbody, 'Outras receitas (' + (receitas.length - maxShow) + ' itens)', outrasRec, 'indent');
+      }
+
+      addDreRow(tbody, '', null, 'separator');
+
+      addDreRow(tbody, 'DESPESAS', totalDespesas, 'subtotal');
+      for (var i = 0; i < Math.min(despesas.length, maxShow); i++) {
+        var label = despesas[i].conta ? 'Conta ' + despesas[i].conta : 'Item ' + (i + 1);
+        addDreRow(tbody, label, despesas[i].valor, 'indent');
+      }
+      if (despesas.length > maxShow) {
+        var outrasDes = 0;
+        for (var j = maxShow; j < despesas.length; j++) outrasDes += despesas[j].valor;
+        addDreRow(tbody, 'Outras despesas (' + (despesas.length - maxShow) + ' itens)', outrasDes, 'indent');
+      }
+
+      addDreRow(tbody, '', null, 'separator');
+      addDreRow(tbody, resultado >= 0 ? 'LUCRO LIQUIDO' : 'PREJUIZO LIQUIDO', resultado, 'total');
+
+      log('DRE condensado: ' + receitas.length + ' receitas, ' + despesas.length + ' despesas');
+    }
+
+    function addDreRow(tbody, descr, valor, type) {
+      var tr = document.createElement('tr');
+
+      if (type === 'separator') {
+        tr.className = 'section-sep';
+        tr.innerHTML = '<td colspan="2"></td>';
+        tbody.appendChild(tr);
+        return;
+      }
+
+      if (type === 'subtotal') tr.className = 'subtotal';
+      if (type === 'total') tr.className = 'total';
+      if (type === 'indent') tr.className = 'indent';
+
+      var valorFormatted = valor !== null ? formatBRL(valor) : '';
+      var colorClass = valor > 0 ? 'positive' : (valor < 0 ? 'negative' : '');
+
+      tr.innerHTML = '<td>' + escapeHtml(descr) + '</td>'
+        + '<td class="' + colorClass + '">' + valorFormatted + '</td>';
+      tbody.appendChild(tr);
+    }
+
+    function updateSummaryCards(items) {
+      var totalReceitas = 0, totalDespesas = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].valor > 0) totalReceitas += items[i].valor;
+        else if (items[i].valor < 0) totalDespesas += items[i].valor;
+      }
+      var resultado = totalReceitas + totalDespesas;
+
+      var elRec = document.getElementById('summaryReceitas');
+      elRec.textContent = formatBRL(totalReceitas);
+      elRec.className = 'value positive';
+
+      var elDes = document.getElementById('summaryDespesas');
+      elDes.textContent = formatBRL(totalDespesas);
+      elDes.className = 'value negative';
+
+      var elRes = document.getElementById('summaryResultado');
+      elRes.textContent = formatBRL(resultado);
+      elRes.className = 'value ' + (resultado >= 0 ? 'positive' : 'negative');
     }
 
     function formatBRL(value) {
