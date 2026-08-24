@@ -320,6 +320,7 @@
           </select>
         </div>
       </div>
+      <div class="result-box" id="errorBox" style="display:none;background:#fef2f2;color:#dc2626;margin-bottom:0.75rem;"></div>
       <button class="primary" onclick="generateUser()">Gerar credenciais</button>
 
       <div class="result-box success" id="resultBox">
@@ -441,48 +442,85 @@
       return s;
     }
 
+    function showError(msg) {
+      var box = document.getElementById('errorBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('errorBox').style.display = 'none';
+    }
+
     function generateUser() {
-      var name = document.getElementById('newName').value.trim();
-      var username = document.getElementById('newUsername').value.trim().toLowerCase();
-      var password = document.getElementById('newPassword').value;
-      var role = document.getElementById('newRole').value;
+      try {
+        hideError();
+        document.getElementById('resultBox').classList.remove('visible');
 
-      if (!name || !username || !password) {
-        alert('Preencha todos os campos.');
-        return;
+        var name = document.getElementById('newName').value.trim();
+        var username = document.getElementById('newUsername').value.trim().toLowerCase();
+        var password = document.getElementById('newPassword').value;
+        var role = document.getElementById('newRole').value;
+
+        if (!name || !username || !password) {
+          showError('Preencha todos os campos.');
+          return;
+        }
+
+        if (username.length < 3) {
+          showError('O usuario deve ter pelo menos 3 caracteres.');
+          return;
+        }
+
+        if (password.length < 4) {
+          showError('A senha deve ter pelo menos 4 caracteres.');
+          return;
+        }
+
+        var hash = md5(password);
+        var command = 'Adicione o usuario "' + username + '" ao meu site.\n'
+          + 'Nome: ' + name + '\n'
+          + 'Hash: ' + hash + '\n'
+          + 'Perfil: ' + role;
+
+        document.getElementById('resultCode').textContent = command;
+        document.getElementById('resultBox').classList.add('visible');
+
+        document.getElementById('newName').value = '';
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newPassword').value = '';
+      } catch (e) {
+        showError('Erro ao gerar credenciais: ' + e.message);
       }
-
-      if (username.length < 3) {
-        alert('O usuario deve ter pelo menos 3 caracteres.');
-        return;
-      }
-
-      if (password.length < 4) {
-        alert('A senha deve ter pelo menos 4 caracteres.');
-        return;
-      }
-
-      var hash = md5(password);
-      var command = 'Adicione o usuario "' + username + '" ao meu site.\n'
-        + 'Nome: ' + name + '\n'
-        + 'Hash: ' + hash + '\n'
-        + 'Perfil: ' + role;
-
-      document.getElementById('resultCode').textContent = command;
-      document.getElementById('resultBox').classList.add('visible');
-
-      document.getElementById('newName').value = '';
-      document.getElementById('newUsername').value = '';
-      document.getElementById('newPassword').value = '';
     }
 
     function copyResult() {
       var text = document.getElementById('resultCode').textContent;
-      navigator.clipboard.writeText(text).then(function() {
-        var btn = document.querySelector('.copy-btn');
-        btn.textContent = 'Copiado!';
-        setTimeout(function() { btn.textContent = 'Copiar comando'; }, 2000);
-      });
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            var btn = document.querySelector('.copy-btn');
+            btn.textContent = 'Copiado!';
+            setTimeout(function() { btn.textContent = 'Copiar comando'; }, 2000);
+          }).catch(function() { fallbackCopy(text); });
+        } else {
+          fallbackCopy(text);
+        }
+      } catch (e) { fallbackCopy(text); }
+    }
+
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      var btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copiado!';
+      setTimeout(function() { btn.textContent = 'Copiar comando'; }, 2000);
     }
   </script>
 
