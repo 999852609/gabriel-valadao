@@ -397,12 +397,9 @@
   <div class="container">
     <nav>
       <a href="calculadora.html" class="active">Calculadora</a>
-      <a href="dre.html">DRE</a>
-      <a href="admin.html" id="adminLink" style="display:none">Admin</a>
       <span class="spacer"></span>
       <button class="logout-btn" onclick="sessionStorage.clear(); window.location.href='index.html';">Sair</button>
     </nav>
-    <script>if(sessionStorage.getItem('authRole')==='admin')document.getElementById('adminLink').style.display='';</script>
 
     <h1>Calculadora de Juros Compostos</h1>
     <p class="subtitle">Simule o crescimento do seu investimento ao longo do tempo</p>
