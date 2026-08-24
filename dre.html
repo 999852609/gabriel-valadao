@@ -360,10 +360,18 @@
 </head>
 <body>
 
+  <script>
+    if (!sessionStorage.getItem('authToken')) {
+      window.location.href = 'index.html';
+    }
+  </script>
+
   <div class="container">
     <nav>
-      <a href="index.html">Calculadora</a>
+      <a href="calculadora.html">Calculadora</a>
       <a href="dre.html" class="active">DRE</a>
+      <span style="flex:1"></span>
+      <button onclick="sessionStorage.removeItem('authToken'); window.location.href='index.html';" style="padding:0.5rem 1rem;border-radius:8px;font-size:0.8rem;font-weight:600;color:#dc2626;background:#fef2f2;border:1.5px solid #fecaca;cursor:pointer;">Sair</button>
     </nav>
 
     <h1>DRE - Demonstracao de Resultado</h1>
