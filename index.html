@@ -47,6 +47,30 @@
       font-size: 0.95rem;
     }
 
+    nav {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--card);
+      border: 1.5px solid var(--input-border);
+      transition: all 0.2s;
+    }
+
+    nav a:hover { border-color: var(--accent); color: var(--accent); }
+    nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
     .container {
       width: 100%;
       max-width: 520px;
@@ -338,6 +362,11 @@
 <body>
 
   <div class="container">
+    <nav>
+      <a href="index.html" class="active">Calculadora</a>
+      <a href="dre.html">DRE</a>
+    </nav>
+
     <h1>Calculadora de Juros Compostos</h1>
     <p class="subtitle">Simule o crescimento do seu investimento ao longo do tempo</p>
 
