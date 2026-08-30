@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: jarvis-trip
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn jarvis_trip.app:app
+    plan: free
+    envVars:
+      - key: SERPAPI_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: ALERT_EMAIL_TO
+        sync: false
+      - key: ORIGIN_AIRPORT
+        value: GYN
+      - key: MAX_PRICE_BRL
+        value: "800"
+      - key: PRICE_DROP_PERCENT
+        value: "20"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
