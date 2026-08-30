@@ -16,17 +16,21 @@ EMAIL_TEMPLATE = """\
     </div>
     <div style="padding: 24px;">
       {% for deal in deals %}
-      <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px; {% if not loop.last %}{% endif %}">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <h2 style="margin: 0; color: #1a73e8; font-size: 18px;">{{ deal.origin }} &rarr; {{ deal.destination }}</h2>
+      <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+        <div style="margin-bottom: 8px;">
+          <h2 style="margin: 0; color: #1a73e8; font-size: 18px;">{{ deal.origin }} &rarr; {{ deal.city_to }}, {{ deal.country_to }}</h2>
           <span style="font-size: 24px; font-weight: bold; color: #2e7d32;">R$ {{ deal.price }}</span>
         </div>
         <p style="margin: 4px 0; color: #555;">
           <strong>Ida:</strong> {{ deal.departure_date }}
           {% if deal.return_date %} &nbsp;|&nbsp; <strong>Volta:</strong> {{ deal.return_date }}{% endif %}
         </p>
-        {% if deal.duration %}<p style="margin: 4px 0; color: #555;"><strong>Duração:</strong> {{ deal.duration }}</p>{% endif %}
+        {% if deal.nights %}<p style="margin: 4px 0; color: #555;"><strong>Noites:</strong> {{ deal.nights }}</p>{% endif %}
+        <p style="margin: 4px 0; color: #555;"><strong>Paradas:</strong> {{ deal.stops }}</p>
         <p style="margin: 8px 0 0; color: #777; font-size: 13px;">{{ deal.reason }}</p>
+        {% if deal.booking_link %}
+        <a href="{{ deal.booking_link }}" style="display: inline-block; margin-top: 12px; padding: 8px 16px; background: #1a73e8; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px;">Ver e reservar</a>
+        {% endif %}
       </div>
       {% endfor %}
       <p style="text-align: center; color: #999; font-size: 12px; margin-top: 24px;">
@@ -45,12 +49,12 @@ def send_alert(deals: list[dict], search_date: str) -> None:
     )
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"✈️ Jarvis Trip — {len(deals)} voo{'s' if len(deals) > 1 else ''} barato{'s' if len(deals) > 1 else ''} encontrado{'s' if len(deals) > 1 else ''}"
+    msg["Subject"] = f"Jarvis Trip — {len(deals)} voo{'s' if len(deals) > 1 else ''} barato{'s' if len(deals) > 1 else ''}"
     msg["From"] = Config.SMTP_USER
     msg["To"] = Config.ALERT_EMAIL_TO
 
     plain = "\n".join(
-        f"{d['origin']} -> {d['destination']}: R${d['price']} ({d['departure_date']})"
+        f"{d['origin']} -> {d['city_to']}: R${d['price']} ({d['departure_date']})"
         for d in deals
     )
     msg.attach(MIMEText(plain, "plain"))

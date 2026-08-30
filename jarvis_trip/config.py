@@ -5,9 +5,8 @@ load_dotenv()
 
 
 class Config:
-    AMADEUS_API_KEY = os.environ["AMADEUS_API_KEY"]
-    AMADEUS_API_SECRET = os.environ["AMADEUS_API_SECRET"]
-    AMADEUS_BASE_URL = "https://test.api.amadeus.com"
+    TEQUILA_API_KEY = os.environ["TEQUILA_API_KEY"]
+    TEQUILA_BASE_URL = "https://api.tequila.kiwi.com"
 
     SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
