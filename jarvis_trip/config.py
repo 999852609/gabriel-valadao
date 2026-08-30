@@ -5,8 +5,7 @@ load_dotenv()
 
 
 class Config:
-    TEQUILA_API_KEY = os.environ["TEQUILA_API_KEY"]
-    TEQUILA_BASE_URL = "https://api.tequila.kiwi.com"
+    SERPAPI_KEY = os.environ["SERPAPI_KEY"]
 
     SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

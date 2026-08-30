@@ -19,13 +19,12 @@ def run() -> None:
     client = FlightClient()
     history = load_history()
 
-    raw_flights = client.search_cheap_flights(Config.ORIGIN_AIRPORT, max_price=Config.MAX_PRICE_BRL)
-    log.info("Kiwi retornou %d voos", len(raw_flights))
+    flights = client.search_cheap_flights(Config.ORIGIN_AIRPORT, max_price=Config.MAX_PRICE_BRL)
+    log.info("Google Flights retornou %d voos abaixo do teto", len(flights))
 
     deals: list[dict] = []
 
-    for raw in raw_flights:
-        flight = client.parse_flight(raw)
+    for flight in flights:
         dest = flight["destination"]
         price = flight["price"]
 

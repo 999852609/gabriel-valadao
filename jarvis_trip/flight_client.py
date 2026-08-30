@@ -2,75 +2,79 @@ from datetime import datetime, timedelta
 import requests
 from jarvis_trip.config import Config
 
+POPULAR_DESTINATIONS = [
+    "SAO", "GIG", "BSB", "SSA", "REC", "FOR", "CWB", "POA", "BEL", "MAO",
+    "FLN", "NAT", "MCZ", "CGR", "VCP", "SDU", "CNF", "SLZ", "THE", "AJU",
+    "GRU", "MIA", "EZE", "SCL", "BOG", "LIM", "CUN", "MEX", "LIS", "MAD",
+]
+
 
 class FlightClient:
-    def __init__(self):
-        self._headers = {"apikey": Config.TEQUILA_API_KEY}
-
     def search_cheap_flights(self, origin: str, max_price: float | None = None) -> list[dict]:
-        date_from = datetime.now().strftime("%d/%m/%Y")
-        date_to = (datetime.now() + timedelta(days=60)).strftime("%d/%m/%Y")
-        return_from = (datetime.now() + timedelta(days=1)).strftime("%d/%m/%Y")
-        return_to = (datetime.now() + timedelta(days=67)).strftime("%d/%m/%Y")
+        date_from = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+        date_to = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
 
+        deals = []
+        for dest in POPULAR_DESTINATIONS:
+            if dest == origin:
+                continue
+            result = self._search_route(origin, dest, date_from, date_to)
+            if not result:
+                continue
+            if max_price and result["price"] > max_price:
+                continue
+            deals.append(result)
+
+        deals.sort(key=lambda x: x["price"])
+        return deals
+
+    def _search_route(self, origin: str, dest: str, outbound: str, return_date: str) -> dict | None:
         params = {
-            "fly_from": origin,
-            "date_from": date_from,
-            "date_to": date_to,
-            "return_from": return_from,
-            "return_to": return_to,
-            "flight_type": "round",
-            "nights_in_dst_from": 2,
-            "nights_in_dst_to": 14,
-            "curr": "BRL",
-            "locale": "pt",
-            "limit": 50,
-            "sort": "price",
-            "one_for_city": 1,
+            "engine": "google_flights",
+            "departure_id": origin,
+            "arrival_id": dest,
+            "outbound_date": outbound,
+            "return_date": return_date,
+            "currency": "BRL",
+            "hl": "pt",
+            "gl": "br",
+            "type": "1",
+            "api_key": Config.SERPAPI_KEY,
         }
-        if max_price:
-            params["price_to"] = int(max_price)
+        try:
+            resp = requests.get("https://serpapi.com/search", params=params, timeout=30)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+        except (requests.RequestException, ValueError):
+            return None
 
-        resp = requests.get(
-            f"{Config.TEQUILA_BASE_URL}/v2/search",
-            headers=self._headers,
-            params=params,
-            timeout=30,
-        )
-        if resp.status_code == 404:
-            return []
-        resp.raise_for_status()
-        return resp.json().get("data", [])
+        best = data.get("best_flights", [])
+        other = data.get("other_flights", [])
+        all_flights = best + other
+        if not all_flights:
+            return None
 
-    @staticmethod
-    def parse_flight(raw: dict) -> dict:
-        routes = raw.get("route", [])
-        outbound = [r for r in routes if r.get("return") == 0]
-        inbound = [r for r in routes if r.get("return") == 1]
+        cheapest = min(all_flights, key=lambda f: f.get("price", 99999))
+        legs = cheapest.get("flights", [])
+        if not legs:
+            return None
 
-        def format_dt(iso: str) -> str:
-            try:
-                return datetime.fromisoformat(iso).strftime("%d/%m/%Y %H:%M")
-            except (ValueError, TypeError):
-                return iso
-
-        stops_out = max(0, len(outbound) - 1)
-        stops_in = max(0, len(inbound) - 1)
-        stops_label = ""
-        if stops_out == 0 and stops_in == 0:
-            stops_label = "Direto"
-        else:
-            stops_label = f"{stops_out} parada(s) ida, {stops_in} volta"
+        first_leg = legs[0]
+        last_leg = legs[-1]
+        stops = max(0, len(legs) - 1)
+        duration = cheapest.get("total_duration", 0)
+        hours, minutes = divmod(duration, 60)
 
         return {
-            "origin": raw.get("flyFrom", ""),
-            "destination": raw.get("flyTo", ""),
-            "city_to": raw.get("cityTo", ""),
-            "country_to": raw.get("countryTo", {}).get("name", ""),
-            "price": raw.get("price", 0),
-            "departure_date": format_dt(raw.get("local_departure", "")),
-            "return_date": format_dt(raw.get("local_arrival", "")) if inbound else "",
-            "nights": raw.get("nightsInDest", ""),
-            "stops": stops_label,
-            "booking_link": raw.get("deep_link", ""),
+            "origin": origin,
+            "destination": dest,
+            "city_to": last_leg.get("arrival_airport", {}).get("name", dest),
+            "country_to": "",
+            "price": cheapest.get("price", 0),
+            "departure_date": first_leg.get("departure_airport", {}).get("time", outbound),
+            "return_date": return_date,
+            "duration": f"{hours}h{minutes:02d}m" if duration else "",
+            "stops": "Direto" if stops == 0 else f"{stops} parada(s)",
+            "booking_link": data.get("search_metadata", {}).get("google_flights_url", ""),
         }
